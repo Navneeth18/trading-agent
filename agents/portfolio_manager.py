@@ -29,8 +29,17 @@ class PortfolioManager:
         return thinking, final_answer
     
     def make_decision(self, ticker: str, sentiment_data: Dict, technical_data: Dict, 
-                     market_data: Dict) -> Dict:
-        """Make final trading decision with reasoning."""
+                     market_data: Dict, historical_trades: list = None) -> Dict:
+        """Make final trading decision with reasoning and historical context."""
+        
+        # Build historical context if available
+        historical_context = ""
+        if historical_trades and len(historical_trades) > 0:
+            historical_context = "\n\nHISTORICAL CONTEXT (Past 5 trades for this stock):\n"
+            for i, trade in enumerate(historical_trades[:5], 1):
+                historical_context += f"{i}. {trade['timestamp'].strftime('%Y-%m-%d')}: {trade['action']} at ${trade['price']:.2f} "
+                historical_context += f"(Sentiment: {trade['sentiment_avg']:.2f}, RSI: {trade['rsi']:.1f}) "
+                historical_context += f"- {trade['reasoning']}\n"
         
         prompt = f"""You are a Portfolio Manager making critical trading decisions. Use your reasoning capabilities to validate this trade signal.
 
@@ -54,13 +63,17 @@ TECHNICAL ANALYSIS:
 MARKET DATA:
 - Current Price: ${market_data['current_price']:.2f}
 - Change: ${market_data['change']:.2f} ({market_data['percent_change']:.2f}%)
-
+- High: ${market_data['high']:.2f}
+- Low: ${market_data['low']:.2f}
+- Previous Close: ${market_data['previous_close']:.2f}
+{historical_context}
 INSTRUCTIONS:
 1. Use <think> tags to show your Chain of Thought reasoning
 2. In your <think> block, analyze:
    - Alignment between sentiment and technical signals
    - Risk factors and potential conflicts
    - Market conditions and price action
+   - Historical patterns (if available)
    - Why you accept or reject this signal
 3. After </think>, provide your final decision in this exact format:
 
@@ -71,6 +84,11 @@ REASONING: [One sentence explanation]
 Be decisive and clear. Your reasoning in <think> must justify your final decision."""
 
         try:
+            print(f"\n[DeepSeek-R1] Making decision for {ticker}...")
+            print(f"[DeepSeek-R1] Sentiment: {sentiment_data['avg_sentiment']} ({sentiment_data['avg_score']:.2f})")
+            print(f"[DeepSeek-R1] RSI: {technical_data['indicators']['rsi']:.2f}")
+            print(f"[DeepSeek-R1] Calling model (this may take 1-2 minutes)...")
+            
             response = requests.post(
                 f"{self.base_url}/api/generate",
                 json={
@@ -78,14 +96,28 @@ Be decisive and clear. Your reasoning in <think> must justify your final decisio
                     "prompt": prompt,
                     "stream": False
                 },
-                timeout=180,  # Increased to 3 minutes for DeepSeek-R1
-                verify=False  # Bypass SSL verification
+                timeout=180,
+                verify=False
             )
             response.raise_for_status()
-            full_response = response.json()['response']
+            
+            # Parse response properly
+            result = response.json()
+            full_response = result.get('response', '')
+            
+            print(f"\n[DeepSeek-R1] Response received ({len(full_response)} chars)")
             
             # Extract thinking and decision
             thinking, final_answer = self.extract_thinking(full_response)
+            
+            if thinking:
+                print(f"\n{'='*80}")
+                print(f"[DeepSeek-R1] THINKING PROCESS:")
+                print(f"{'='*80}")
+                print(thinking)
+                print(f"{'='*80}\n")
+            
+            print(f"[DeepSeek-R1] Final Answer: {final_answer[:200]}...")
             
             # Parse decision
             decision_match = re.search(r'DECISION:\s*(BUY|SELL|HOLD)', final_answer, re.IGNORECASE)
@@ -98,6 +130,31 @@ Be decisive and clear. Your reasoning in <think> must justify your final decisio
             
             approved = decision in ['BUY', 'SELL']
             
+            print(f"[DeepSeek-R1] Decision: {decision} | Confidence: {confidence}")
+            print(f"[DeepSeek-R1] Approved: {approved}\n")
+            
+            return {
+                'ticker': ticker,
+                'decision': decision,
+                'confidence': confidence,
+                'reasoning': reasoning,
+                'thinking_process': thinking,
+                'approved': approved,
+                'full_response': full_response
+            }
+            
+        except Exception as e:
+            error_msg = f'Error in decision making: {str(e)}'
+            print(f"[DeepSeek-R1] ERROR: {error_msg}")
+            return {
+                'ticker': ticker,
+                'decision': 'HOLD',
+                'confidence': 'LOW',
+                'reasoning': error_msg,
+                'thinking_process': '',
+                'approved': False,
+                'full_response': ''
+            }
             return {
                 'ticker': ticker,
                 'decision': decision,

@@ -122,7 +122,7 @@ class TradingWorkflow:
         return state
     
     def portfolio_manager_node(self, state: TradingState) -> TradingState:
-        """Node 4: Make final decision using DeepSeek-R1."""
+        """Node 4: Make final decision using DeepSeek-R1 with historical context."""
         if state.get('error'):
             return state
         
@@ -132,8 +132,11 @@ class TradingWorkflow:
             technical_data = state['technical_data']
             market_data = state['market_data']
             
+            # Fetch historical trades for this ticker
+            historical_trades = self.db.get_recent_trades(ticker=ticker, limit=5)
+            
             decision = self.portfolio_manager.make_decision(
-                ticker, sentiment_data, technical_data, market_data
+                ticker, sentiment_data, technical_data, market_data, historical_trades
             )
             
             # Store trade in database

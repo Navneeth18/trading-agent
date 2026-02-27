@@ -64,6 +64,7 @@ Provide a concise technical analysis (2-3 sentences) focusing on:
 3. Overall technical signal (bullish/bearish/neutral)"""
 
         try:
+            print(f"\n[Llama 3.2] Analyzing technical indicators for {ticker}...")
             response = requests.post(
                 f"{self.base_url}/api/generate",
                 json={
@@ -71,13 +72,22 @@ Provide a concise technical analysis (2-3 sentences) focusing on:
                     "prompt": prompt,
                     "stream": False
                 },
-                timeout=60,  # 1 minute for Llama 3.2
-                verify=False  # Bypass SSL verification
+                timeout=60,
+                verify=False
             )
             response.raise_for_status()
-            return response.json()['response']
+            
+            # Parse response properly
+            result = response.json()
+            analysis = result.get('response', '')
+            
+            print(f"[Llama 3.2] Analysis: {analysis[:200]}...")
+            return analysis
+            
         except Exception as e:
-            return f"Technical analysis unavailable: {str(e)}"
+            error_msg = f"Technical analysis unavailable: {str(e)}"
+            print(f"[Llama 3.2] Error: {error_msg}")
+            return error_msg
     
     def analyze(self, ticker: str, market_data: Dict, price_history: pd.DataFrame) -> Dict:
         """Perform complete technical analysis."""
