@@ -22,6 +22,7 @@ class TradingDashboard:
         table.add_column("Ticker", style="cyan", width=8)
         table.add_column("Price", justify="right", style="green")
         table.add_column("Change", justify="right")
+        table.add_column("News Score", justify="center")
         table.add_column("Sentiment", justify="center")
         table.add_column("RSI", justify="right")
         table.add_column("Decision", justify="center", style="bold")
@@ -43,11 +44,20 @@ class TradingDashboard:
             change_str = f"${change:.2f} ({change_pct:+.2f}%)"
             change_style = "green" if change >= 0 else "red"
             
+            # News score
+            news_alert = data.get('news_alert', {})
+            news_score = news_alert.get('score', 0.0)
+            news_alert_flag = news_alert.get('alert', False)
+            if news_alert_flag:
+                news_str = f"[bold]{'🔴' if news_score < 0 else '🟢'} {news_score:+.3f}[/bold]"
+            else:
+                news_str = f"{news_score:+.3f}" if news_score != 0.0 else "-"
+
             # Sentiment emoji
             sentiment_map = {
-                'positive': '📈 Positive',
-                'negative': '📉 Negative',
-                'neutral': '➡️  Neutral'
+                'positive': '[green]+ Positive[/green]',
+                'negative': '[red]- Negative[/red]',
+                'neutral': '~ Neutral'
             }
             sentiment_str = sentiment_map.get(sentiment.get('avg_sentiment', 'neutral'), 'neutral')
             
@@ -63,6 +73,7 @@ class TradingDashboard:
                 ticker,
                 f"${market.get('current_price', 0):.2f}",
                 f"[{change_style}]{change_str}[/{change_style}]",
+                news_str,
                 sentiment_str,
                 f"{technical.get('indicators', {}).get('rsi', 0):.1f}",
                 f"[{decision_style}]{decision_str}[/{decision_style}]",
@@ -79,14 +90,23 @@ class TradingDashboard:
         decision = data.get('decision', {})
         sentiment = data.get('sentiment_data', {})
         technical = data.get('technical_data', {})
-        
+        news_alert = data.get('news_alert', {})
+
+        news_line = ""
+        if news_alert:
+            score = news_alert.get('score', 0.0)
+            direction = news_alert.get('direction', 'neutral').upper()
+            count = news_alert.get('articles_count', 0)
+            alert_tag = " ⚠️ ALERT" if news_alert.get('alert') else ""
+            news_line = f"\n[bold yellow]Sentinel News:[/bold yellow] score={score:+.3f} ({direction}), {count} articles{alert_tag}"
+
         content = f"""
 [bold cyan]Decision:[/bold cyan] {decision.get('decision', 'N/A')}
 [bold cyan]Confidence:[/bold cyan] {decision.get('confidence', 'N/A')}
 [bold cyan]Reasoning:[/bold cyan] {decision.get('reasoning', 'N/A')}
-
+{news_line}
 [bold yellow]Sentiment Analysis:[/bold yellow]
-  Overall: {sentiment.get('avg_sentiment', 'N/A')} (Score: {sentiment.get('avg_score', 0):.2f})
+  Overall: {sentiment.get('avg_sentiment', 'N/A')} (Score: {sentiment.get('avg_score', 0):.3f})
   Positive: {sentiment.get('positive_ratio', 0):.1%} | Negative: {sentiment.get('negative_ratio', 0):.1%}
 
 [bold yellow]Technical Indicators:[/bold yellow]

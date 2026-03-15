@@ -29,7 +29,8 @@ class PortfolioManager:
         return thinking, final_answer
     
     def make_decision(self, ticker: str, sentiment_data: Dict, technical_data: Dict, 
-                     market_data: Dict, historical_trades: list = None) -> Dict:
+                     market_data: Dict, historical_trades: list = None,
+                     news_alert: Dict = None) -> Dict:
         """Make final trading decision with reasoning and historical context."""
         
         # Build historical context if available
@@ -40,6 +41,19 @@ class PortfolioManager:
                 historical_context += f"{i}. {trade['timestamp'].strftime('%Y-%m-%d')}: {trade['action']} at ${trade['price']:.2f} "
                 historical_context += f"(Sentiment: {trade['sentiment_avg']:.2f}, RSI: {trade['rsi']:.1f}) "
                 historical_context += f"- {trade['reasoning']}\n"
+
+        # Build news alert context
+        news_context = ""
+        if news_alert and news_alert.get('alert'):
+            direction = news_alert.get('direction', 'neutral').upper()
+            score = news_alert.get('score', 0.0)
+            count = news_alert.get('articles_count', 0)
+            news_context = (
+                f"\n\nSENTINEL NEWS ALERT (last 1 hour, time-weighted):\n"
+                f"- Aggregate News Score: {score:.3f} ({direction})\n"
+                f"- Articles Analyzed: {count}\n"
+                f"- ALERT: Strong {direction} signal detected from recent news\n"
+            )
         
         prompt = f"""You are a Portfolio Manager making critical trading decisions. Use your reasoning capabilities to validate this trade signal.
 
@@ -66,7 +80,7 @@ MARKET DATA:
 - High: ${market_data['high']:.2f}
 - Low: ${market_data['low']:.2f}
 - Previous Close: ${market_data['previous_close']:.2f}
-{historical_context}
+{historical_context}{news_context}
 INSTRUCTIONS:
 1. Use <think> tags to show your Chain of Thought reasoning
 2. In your <think> block, analyze:
@@ -96,7 +110,7 @@ Be decisive and clear. Your reasoning in <think> must justify your final decisio
                     "prompt": prompt,
                     "stream": False
                 },
-                timeout=180,
+                timeout=600,
                 verify=False
             )
             response.raise_for_status()

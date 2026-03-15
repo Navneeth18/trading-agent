@@ -94,6 +94,39 @@ class DatabaseManager:
                 """, (ticker, limit))
                 return cur.fetchall()
     
+    def upsert_news_article(self, ticker: str, source: str, headline: str, url: str,
+                            published_at, sentiment_score: float = None) -> bool:
+        """Insert news article, ignore if URL already exists. Returns True if inserted."""
+        with self.get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO news_staging (ticker, source, headline, url, published_at, sentiment_score)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (url) DO NOTHING
+                """, (ticker, source, headline, url, published_at, sentiment_score))
+                return cur.rowcount > 0
+
+    def update_news_sentiment(self, url: str, sentiment_score: float):
+        """Update sentiment score for a news article."""
+        with self.get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE news_staging SET sentiment_score = %s WHERE url = %s
+                """, (sentiment_score, url))
+
+    def get_recent_news(self, ticker: str, hours: int = 1) -> List[Dict]:
+        """Get news articles from the last N hours for a ticker, using created_at for recency."""
+        with self.get_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT * FROM news_staging
+                    WHERE ticker = %s
+                      AND created_at >= NOW() - INTERVAL '1 hour' * %s
+                      AND sentiment_score IS NOT NULL
+                    ORDER BY published_at DESC
+                """, (ticker, hours))
+                return cur.fetchall()
+
     def get_recent_trades(self, ticker: Optional[str] = None, limit: int = 20) -> List[Dict]:
         """Get recent trades, optionally filtered by ticker."""
         with self.get_connection() as conn:

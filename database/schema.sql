@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS market_quotes (
     CONSTRAINT unique_ticker_timestamp UNIQUE (ticker, timestamp)
 );
 
-CREATE INDEX idx_market_quotes_ticker ON market_quotes(ticker);
-CREATE INDEX idx_market_quotes_timestamp ON market_quotes(timestamp);
+CREATE INDEX IF NOT EXISTS idx_market_quotes_ticker ON market_quotes(ticker);
+CREATE INDEX IF NOT EXISTS idx_market_quotes_timestamp ON market_quotes(timestamp);
 
 -- Sentiment scores from FinBERT
 CREATE TABLE IF NOT EXISTS sentiment_scores (
@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS sentiment_scores (
     timestamp TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_sentiment_ticker ON sentiment_scores(ticker);
-CREATE INDEX idx_sentiment_timestamp ON sentiment_scores(timestamp);
+CREATE INDEX IF NOT EXISTS idx_sentiment_ticker ON sentiment_scores(ticker);
+CREATE INDEX IF NOT EXISTS idx_sentiment_timestamp ON sentiment_scores(timestamp);
 
 -- Trade ledger for all transactions
 CREATE TABLE IF NOT EXISTS trade_ledger (
@@ -47,6 +47,22 @@ CREATE TABLE IF NOT EXISTS trade_ledger (
     timestamp TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_trade_ledger_ticker ON trade_ledger(ticker);
-CREATE INDEX idx_trade_ledger_timestamp ON trade_ledger(timestamp);
-CREATE INDEX idx_trade_ledger_action ON trade_ledger(action);
+CREATE INDEX IF NOT EXISTS idx_trade_ledger_ticker ON trade_ledger(ticker);
+CREATE INDEX IF NOT EXISTS idx_trade_ledger_timestamp ON trade_ledger(timestamp);
+CREATE INDEX IF NOT EXISTS idx_trade_ledger_action ON trade_ledger(action);
+
+-- News staging table for Sentinel News Engine
+CREATE TABLE IF NOT EXISTS news_staging (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticker VARCHAR(10) NOT NULL,
+    source VARCHAR(50) NOT NULL,
+    headline TEXT NOT NULL,
+    url TEXT UNIQUE NOT NULL,
+    published_at TIMESTAMP,
+    sentiment_score FLOAT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_news_staging_ticker ON news_staging(ticker);
+CREATE INDEX IF NOT EXISTS idx_news_staging_published_at ON news_staging(published_at);
+CREATE INDEX IF NOT EXISTS idx_news_staging_created_at ON news_staging(created_at);

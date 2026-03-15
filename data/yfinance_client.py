@@ -1,8 +1,13 @@
 """yfinance client for news and historical data."""
+import os
 import yfinance as yf
 import pandas as pd
 from typing import List, Dict
-from datetime import datetime, timedelta
+
+# Clear PostgreSQL SSL cert env vars that break curl/requests
+os.environ.pop('REQUESTS_CA_BUNDLE', None)
+os.environ.pop('CURL_CA_BUNDLE', None)
+os.environ.pop('SSL_CERT_FILE', None)
 
 
 class YFinanceClient:
